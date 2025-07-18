@@ -6,29 +6,28 @@ from tkinter import messagebox, ttk
 # Updated material database with single-value parameters
 CUTTING_PARAMETER = {
     "SS400": {
-        "feed_rate": [1200.0],  # mm/min
+        "feed_rate": [1500.0],  # mm/min
+        "finish_feed_rate": [750.0], # mm/min
         "spindle_speed": [1500],  # RPM
         "depth_of_cut": [0.75],  # mm
     },
     "S45C": {
-        "feed_rate": [1000.0],
-        "spindle_speed": [1500],
+        "feed_rate": [1100.0],
+        "finish_feed_rate": [550.0],
+        "spindle_speed": [1100],
         "depth_of_cut": [0.5],
     },
     "DC11": {
-        "feed_rate": [800.0],
-        "spindle_speed": [1200],
+        "feed_rate": [950.0],
+        "finish_feed_rate": [480.0],
+        "spindle_speed": [950],
         "depth_of_cut": [0.3],
     },
 }
 
 
 def tool_back(code, z_init_post, safe_tool_distance, tool_diameter, workpiece_thickness):
-    code.append("G00 Z{:.2f}".format(z_init_post))  # Move to safe height
-    code.append(
-        "G00 X{:.2f} Y{:.2f}".format(-safe_tool_distance - (tool_diameter / 2), -workpiece_thickness / 2)
-    )  # Move to starting position (slightly before material)
-
+    code.append("G00 Z{:.2f} X{:.2f} Y{:.2f}".format(z_init_post, -safe_tool_distance - (tool_diameter / 2), -workpiece_thickness / 2))  # Move to safe height and starting positio
 
 def start_coolant(code):
     code.append("M08")
@@ -64,8 +63,7 @@ def tool_zero_return(code, all_axis=False, y_z_axis=False):
         code.append("G91 G28 Y0.0")
         code.append("G91 G30 X0.0")
     if y_z_axis is True:  # zero return on start of process
-        code.append("G91 G28 Z0.0")
-        code.append("G91 G28 Y0.0")
+        code.append("G91 G28 Z0.0 Y0.0")
 
 
 def reset_coordinate(code):
@@ -128,9 +126,9 @@ def generate_face_mill_gcode(
             current_depth = total_stock_long
 
         gcode.append(
-            "G01 Z{:.2f} F{:.1f}".format(short_stock_thickness + parallel_block_long - current_depth, feed_rate / 2)
+            "G00 Z{:.2f}".format(short_stock_thickness + parallel_block_long - current_depth)
         )
-        adjustment_feed_rate = feed_rate / 6 if pass_num == passes_per_side_long - 1 else feed_rate
+        adjustment_feed_rate = feed_rate / 2 if pass_num == passes_per_side_long - 1 else feed_rate
         if direction == 1:
             gcode.append(
                 "G01 X{:.2f} Y{:.2f} F{:.1f}".format(
@@ -164,7 +162,7 @@ def generate_face_mill_gcode(
             current_depth = total_stock_long
 
         gcode.append(
-            "G01 Z{:.2f} F{:.1f}".format(short_stock_thickness + parallel_block_long - current_depth, feed_rate / 2)
+            "G00 Z{:.2f}".format(short_stock_thickness + parallel_block_long - current_depth)
         )
         adjustment_feed_rate = feed_rate / 6 if pass_num == num_passes_long - 1 else feed_rate
         if direction == 1:
@@ -215,7 +213,7 @@ def generate_face_mill_gcode(
             current_depth = total_stock_short
 
         gcode.append(
-            "G01 Z{:.2f} F{:.1f}".format(long_stock_thickness + parallel_block_short - current_depth, feed_rate / 2)
+            "G00 Z{:.2f}".format(short_stock_thickness + parallel_block_long - current_depth)
         )
         adjustment_feed_rate = feed_rate / 6 if pass_num == passes_per_side_short - 1 else feed_rate
         if direction == 1:
@@ -251,7 +249,7 @@ def generate_face_mill_gcode(
             current_depth = total_stock_short
 
         gcode.append(
-            "G01 Z{:.2f} F{:.1f}".format(long_stock_thickness + parallel_block_short - current_depth, feed_rate / 2)
+            "G00 Z{:.2f}".format(short_stock_thickness + parallel_block_long - current_depth)
         )
         adjustment_feed_rate = feed_rate / 6 if pass_num == num_passes_short - 1 else feed_rate
         if direction == 1:
