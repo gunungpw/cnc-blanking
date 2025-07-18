@@ -4,9 +4,21 @@ from tkinter import messagebox, ttk
 
 # Material database with recommended parameters
 CUTTING_PARAMETER = {
-    "SS400": {"feed_rate": [300.0, 500.0, 1000.0], "spindle_speed": [1400, 1500, 1600], "depth_of_cut": [0.3, 0.5, 1.0]},
-    "S45C": {"feed_rate": [200.0, 400.0, 800.0], "spindle_speed": [1400, 1500, 1600], "depth_of_cut": [0.3, 0.5, 1.0]},
-    "DC11": {"feed_rate": [300.0, 400.0, 500.0], "spindle_speed": [1400, 1500, 1600], "depth_of_cut": [0.3, 0.5, 1.0]},
+    "SS400": {
+        "feed_rate": [300.0, 500.0, 1000.0],
+        "spindle_speed": [1400, 1500, 1600],
+        "depth_of_cut": [0.3, 0.5, 1.0],
+    },
+    "S45C": {
+        "feed_rate": [200.0, 400.0, 800.0],
+        "spindle_speed": [1400, 1500, 1600],
+        "depth_of_cut": [0.3, 0.5, 1.0],
+    },
+    "DC11": {
+        "feed_rate": [300.0, 400.0, 500.0],
+        "spindle_speed": [1400, 1500, 1600],
+        "depth_of_cut": [0.3, 0.5, 1.0],
+    },
 }
 
 
@@ -37,10 +49,10 @@ def pause_process(code: list, spindle_speed: int):
 
 
 def debug_message(message: str, just_clean_depth: float, remaining_stock: float, num_passes: int):
-    print(f"{message} Cut")
-    print(f"Just clean depth: {just_clean_depth:.2f} mm")
-    print(f"Remaining stock: {remaining_stock:.2f} mm")
-    print(f"Number of adjustment passes: {num_passes}")
+    print("{} Cut".format(message))
+    print("Just clean depth: {:.2f} mm".format(just_clean_depth))
+    print("Remaining stock: {:.2f} mm".format(remaining_stock))
+    print("Number of adjustment passes: {}".format(num_passes))
 
 
 def tool_spindle_stop(code: list):
@@ -62,89 +74,78 @@ def reset_coordinate(code: list):
 
 
 def generate_face_mill_gcode(
-    workpiece_long: float = 100.0,  # Long side of material (mm)
-    workpiece_short: float = 50.0,  # Short side of material (mm)
-    workpiece_thick: float = 20.0,  # Thick side of material (mm)
-    parallel_block_long: float = 0.0,  # Parallel block for long side (mm)
-    parallel_block_short: float = 0.0,  # Parallel block for short side (mm)
-    long_stock_thickness: float = 155.0,  # Long material thickness (mm)
-    short_stock_thickness: float = 53.0,  # Short material thickness (mm)
-    tool_diameter: float = 63.0,  # Face mill diameter (mm)
-    feed_rate: float = 500.0,  # Feed rate (mm/min)
-    spindle_speed: int = 2000,  # Spindle speed (RPM)
-    depth_of_cut: float = 1.0,  # Depth of cut per pass in adjustment (mm)
-    safe_z_distance: float = 20.0,  # Safe Z distance for rapid moves (mm)
-    safe_tool_distance: float = 5.0,  # Safe X distance for rapid moves (mm)
-    just_clean_fraction: float = 0.1,  # Not used in this version
-    debug: bool = False,  # Debug switch
+    workpiece_long: float = 100.0,
+    workpiece_short: float = 50.0,
+    workpiece_thick: float = 20.0,
+    parallel_block_long: float = 0.0,
+    parallel_block_short: float = 0.0,
+    long_stock_thickness: float = 155.0,
+    short_stock_thickness: float = 53.0,
+    tool_diameter: float = 63.0,
+    feed_rate: float = 500.0,
+    spindle_speed: int = 2000,
+    depth_of_cut: float = 1.0,
+    safe_z_distance: float = 20.0,
+    safe_tool_distance: float = 5.0,
+    just_clean_fraction: float = 0.1,
+    debug: bool = False,
 ):
-    ### LONG SIDE ADJUSTMENT ###
-    # Long side Z-position (top of workpiece_short + safe height)
     z_long_init = workpiece_short + safe_z_distance + parallel_block_long
-
-    # Total stock to remove for long side
     total_stock_long = short_stock_thickness - workpiece_short
-
-    # Calculate number of adjustment passes based on total stock
     num_passes_long = int(total_stock_long / depth_of_cut) + (1 if total_stock_long % depth_of_cut > 0 else 0)
-    passes_per_side_long = num_passes_long // 2 + (
-        1 if num_passes_long % 2 == 1 else 0
-    )  # Split passes, favor first side if odd
+    passes_per_side_long = num_passes_long // 2 + (1 if num_passes_long % 2 == 1 else 0)
 
     if debug:
         print("Long Side Adjustment")
-        print(f"Total stock to remove: {total_stock_long:.2f} mm")
-        print(f"Total number of passes: {num_passes_long}")
+        print("Total stock to remove: {:.2f} mm".format(total_stock_long))
+        print("Total number of passes: {}".format(num_passes_long))
         print(
-            f"Passes per side: {passes_per_side_long} (first side), {num_passes_long - passes_per_side_long} (second side)"
+            "Passes per side: {} (first side), {} (second side)".format(
+                passes_per_side_long, num_passes_long - passes_per_side_long
+            )
         )
 
-    # Initialize G-code list
-    gcode: list = []
-
-    # Header
-    gcode.append("%")  # Program start
-    gcode.append("O0131")  # Program Number
-    gcode.append("G00 G40 G49 G80")  # Rapid Positioning, Cancel offsets
-    gcode.append("G21 G90 G54")  # Metric, Absolute, G54 coordinate system
+    gcode = []
+    gcode.append("%")
+    gcode.append("O0131")
+    gcode.append("G00 G40 G49 G80")
+    gcode.append("G21 G90 G54")
     tool_zero_return(gcode, all_axis=True)
     reset_coordinate(gcode)
     gcode.append("(FACEMILL DIA. 63)")
-    gcode.append("M06 T10")  # Tool change to face mill
-    gcode.append(f"M03 S{int(spindle_speed)}")  # Spindle start
+    gcode.append("M06 T10")
+    gcode.append("M03 S{}".format(int(spindle_speed)))
     tool_offset(gcode, z_long_init)
 
-    # Current direction for zigzag
-    direction = 1  # 1 for forward, -1 for reverse
-
-    ### FIRST SIDE OF LONG FACE ###
+    direction = 1
     gcode.append("(CEKAM SISI PANJANG)")
     gcode.append("(ADJUSTMENT SISI PANJANG - SISI PERTAMA)")
     tool_back(gcode, z_long_init, safe_tool_distance, tool_diameter, workpiece_thick)
     start_coolant(gcode)
 
     for pass_num in range(passes_per_side_long):
-        # Calculate current depth
         current_depth = (pass_num + 1) * depth_of_cut
         if current_depth > total_stock_long:
-            current_depth = total_stock_long  # Cap at total stock
+            current_depth = total_stock_long
 
-        # Generate cutting moves
         gcode.append(
-            f"G01 Z{short_stock_thickness + parallel_block_long - current_depth:.2f} F{feed_rate / 2:.1f}"
-        )  # Plunge
+            "G01 Z{:.2f} F{:.1f}".format(short_stock_thickness + parallel_block_long - current_depth, feed_rate / 2)
+        )
         adjustment_feed_rate = feed_rate / 2 if pass_num == passes_per_side_long - 1 else feed_rate
         if direction == 1:
             gcode.append(
-                f"G01 X{workpiece_long + 5 + (tool_diameter / 2):.2f} Y{-workpiece_thick / 2:.2f} F{adjustment_feed_rate:.1f}"
+                "G01 X{:.2f} Y{:.2f} F{:.1f}".format(
+                    workpiece_long + 5 + (tool_diameter / 2), -workpiece_thick / 2, adjustment_feed_rate
+                )
             )
             direction = -1
         else:
             gcode.append(
-                f"G01 X{-tool_diameter / 2 - safe_tool_distance:.2f} Y{-workpiece_thick / 2:.2f} F{adjustment_feed_rate:.1f}"
+                "G01 X{:.2f} Y{:.2f} F{:.1f}".format(
+                    -tool_diameter / 2 - safe_tool_distance, -workpiece_thick / 2, adjustment_feed_rate
+                )
             )
             direction = 1
-        # tool_back(gcode, z_long_init, safe_tool_distance, tool_diameter, workpiece_thick)
 
     stop_coolant(gcode)
     tool_zero_return(gcode, y_z_axis=True)
@@ -152,93 +153,86 @@ def generate_face_mill_gcode(
     reset_coordinate(gcode)
     tool_offset(gcode, z_long_init)
 
-    direction = 1 # reset direction for long side second phase
-
-    ### SECOND SIDE OF LONG FACE ###
+    direction = 1
     gcode.append("(PUTAR KE SISI BERLAWANAN)")
     gcode.append("(ADJUSTMENT SISI PANJANG - SISI KEDUA)")
     tool_back(gcode, z_long_init, safe_tool_distance, tool_diameter, workpiece_thick)
     start_coolant(gcode)
 
     for pass_num in range(passes_per_side_long, num_passes_long):
-        # Calculate current depth
         current_depth = (pass_num + 1) * depth_of_cut
         if current_depth > total_stock_long:
-            current_depth = total_stock_long  # Cap at total stock
+            current_depth = total_stock_long
 
-        # Generate cutting moves
         gcode.append(
-            f"G01 Z{short_stock_thickness + parallel_block_long - current_depth:.2f} F{feed_rate / 2:.1f}"
-        )  # Plunge
+            "G01 Z{:.2f} F{:.1f}".format(short_stock_thickness + parallel_block_long - current_depth, feed_rate / 2)
+        )
         adjustment_feed_rate = feed_rate / 2 if pass_num == num_passes_long - 1 else feed_rate
         if direction == 1:
             gcode.append(
-                f"G01 X{workpiece_long + 5 + (tool_diameter / 2):.2f} Y{-workpiece_thick / 2:.2f} F{adjustment_feed_rate:.1f}"
+                "G01 X{:.2f} Y{:.2f} F{:.1f}".format(
+                    workpiece_long + 5 + (tool_diameter / 2), -workpiece_thick / 2, adjustment_feed_rate
+                )
             )
             direction = -1
         else:
             gcode.append(
-                f"G01 X{-tool_diameter / 2 - safe_tool_distance:.2f} Y{-workpiece_thick / 2:.2f} F{adjustment_feed_rate:.1f}"
+                "G01 X{:.2f} Y{:.2f} F{:.1f}".format(
+                    -tool_diameter / 2 - safe_tool_distance, -workpiece_thick / 2, adjustment_feed_rate
+                )
             )
             direction = 1
-        # tool_back(gcode, z_long_init, safe_tool_distance, tool_diameter, workpiece_thick)
 
     stop_coolant(gcode)
     tool_zero_return(gcode, y_z_axis=True)
     pause_process(gcode, int(spindle_speed))
     reset_coordinate(gcode)
 
-    ### SHORT SIDE ADJUSTMENT ###
     z_short_init = workpiece_long + safe_z_distance + parallel_block_long
     tool_offset(gcode, z_height=z_short_init)
-
-    # Total stock to remove for short side
     total_stock_short = long_stock_thickness - workpiece_long
-
-    # Calculate number of adjustment passes based on total stock
     num_passes_short = int(total_stock_short / depth_of_cut) + (1 if total_stock_short % depth_of_cut > 0 else 0)
-    passes_per_side_short = num_passes_short // 2 + (
-        1 if num_passes_short % 2 == 1 else 0
-    )  # Split passes, favor first side if odd
+    passes_per_side_short = num_passes_short // 2 + (1 if num_passes_short % 2 == 1 else 0)
 
     if debug:
         print("Short Side Adjustment")
-        print(f"Total stock to remove: {total_stock_short:.2f} mm")
-        print(f"Total number of passes: {num_passes_short}")
+        print("Total stock to remove: {:.2f} mm".format(total_stock_short))
+        print("Total number of passes: {}".format(num_passes_short))
         print(
-            f"Passes per side: {passes_per_side_short} (first side), {num_passes_short - passes_per_side_short} (second side)"
+            "Passes per side: {} (first side), {} (second side)".format(
+                passes_per_side_short, num_passes_short - passes_per_side_short
+            )
         )
 
-    direction = 1  # Reset direction for short side
-
-    ### FIRST SIDE OF SHORT FACE ###
+    direction = 1
     gcode.append("(CEKAM SISI PENDEK)")
     gcode.append("(ADJUSTMENT SISI PENDEK - SISI PERTAMA)")
     tool_back(gcode, z_short_init, safe_tool_distance, tool_diameter, workpiece_thick)
     start_coolant(gcode)
 
     for pass_num in range(passes_per_side_short):
-        # Calculate current depth
         current_depth = (pass_num + 1) * depth_of_cut
         if current_depth > total_stock_short:
-            current_depth = total_stock_short  # Cap at total stock
+            current_depth = total_stock_short
 
-        # Generate cutting moves
         gcode.append(
-            f"G01 Z{long_stock_thickness + parallel_block_short - current_depth:.2f} F{feed_rate / 2:.1f}"
-        )  # Plunge
+            "G01 Z{:.2f} F{:.1f}".format(long_stock_thickness + parallel_block_short - current_depth, feed_rate / 2)
+        )
         adjustment_feed_rate = feed_rate / 2 if pass_num == passes_per_side_short - 1 else feed_rate
         if direction == 1:
             gcode.append(
-                f"G01 X{workpiece_short + 5 + (tool_diameter / 2):.2f} Y{-workpiece_thick / 2:.2f} F{adjustment_feed_rate:.1f}"
+                "G01 X{:.2f} Y{:.2f} F{:.1f}".format(
+                    workpiece_short + 5 + (tool_diameter / 2), -workpiece_thick / 2, adjustment_feed_rate
+                )
             )
             direction = -1
         else:
             gcode.append(
-                f"G01 X{-tool_diameter / 2 - safe_tool_distance:.2f} Y{-workpiece_thick / 2:.2f} F{adjustment_feed_rate:.1f}"
+                "G01 X{:.2f} Y{:.2f} F{:.1f}".format(
+                    -tool_diameter / 2 - safe_tool_distance, -workpiece_thick / 2, adjustment_feed_rate
+                )
             )
             direction = 1
-        # tool_back(gcode, z_short_init, safe_tool_distance, tool_diameter, workpiece_thick)
 
     stop_coolant(gcode)
     tool_zero_return(gcode, y_z_axis=True)
@@ -246,43 +240,41 @@ def generate_face_mill_gcode(
     reset_coordinate(gcode)
     tool_offset(gcode, z_short_init)
 
-
-    direction = 1  # Reset direction for short side second phase
-    ### SECOND SIDE OF SHORT FACE ###
+    direction = 1
     gcode.append("(PUTAR KE SISI BERLAWANAN)")
     gcode.append("(ADJUSTMENT SISI PENDEK - SISI KEDUA)")
     tool_back(gcode, z_short_init, safe_tool_distance, tool_diameter, workpiece_thick)
     start_coolant(gcode)
 
     for pass_num in range(passes_per_side_short, num_passes_short):
-        # Calculate current depth
         current_depth = (pass_num + 1) * depth_of_cut
         if current_depth > total_stock_short:
-            current_depth = total_stock_short  # Cap at total stock
+            current_depth = total_stock_short
 
-        # Generate cutting moves
         gcode.append(
-            f"G01 Z{long_stock_thickness + parallel_block_short - current_depth:.2f} F{feed_rate / 2:.1f}"
-        )  # Plunge
+            "G01 Z{:.2f} F{:.1f}".format(long_stock_thickness + parallel_block_short - current_depth, feed_rate / 2)
+        )
         adjustment_feed_rate = feed_rate / 2 if pass_num == num_passes_short - 1 else feed_rate
         if direction == 1:
             gcode.append(
-                f"G01 X{workpiece_short + 5 + (tool_diameter / 2):.2f} Y{-workpiece_thick / 2:.2f} F{adjustment_feed_rate:.1f}"
+                "G01 X{:.2f} Y{:.2f} F{:.1f}".format(
+                    workpiece_short + 5 + (tool_diameter / 2), -workpiece_thick / 2, adjustment_feed_rate
+                )
             )
             direction = -1
         else:
             gcode.append(
-                f"G01 X{-tool_diameter / 2 - safe_tool_distance:.2f} Y{-workpiece_thick / 2:.2f} F{adjustment_feed_rate:.1f}"
+                "G01 X{:.2f} Y{:.2f} F{:.1f}".format(
+                    -tool_diameter / 2 - safe_tool_distance, -workpiece_thick / 2, adjustment_feed_rate
+                )
             )
             direction = 1
-        # tool_back(gcode, z_short_init, safe_tool_distance, tool_diameter, workpiece_thick)
 
-    # Program end
     stop_coolant(gcode)
     tool_spindle_stop(gcode)
     tool_zero_return(gcode, y_z_axis=True)
-    gcode.append("M30")  # Program end
-    gcode.append("%")  # End of file
+    gcode.append("M30")
+    gcode.append("%")
 
     return gcode
 
