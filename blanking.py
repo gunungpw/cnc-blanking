@@ -134,7 +134,7 @@ def generate_face_mill_gcode(
         if direction == 1:
             gcode.append(
                 "G01 X{:.2f} Y{:.2f} F{:.1f}".format(
-                    workpiece_long + 5 + (tool_diameter / 2), -workpiece_thick / 2, adjustment_feed_rate
+                    long_stock_thickness + safe_tool_distance + (tool_diameter / 2), -workpiece_thick / 2, adjustment_feed_rate
                 )
             )
             direction = -1
@@ -170,7 +170,7 @@ def generate_face_mill_gcode(
         if direction == 1:
             gcode.append(
                 "G01 X{:.2f} Y{:.2f} F{:.1f}".format(
-                    workpiece_long + 5 + (tool_diameter / 2), -workpiece_thick / 2, adjustment_feed_rate
+                    long_stock_thickness + safe_tool_distance + (tool_diameter / 2), -workpiece_thick / 2, adjustment_feed_rate
                 )
             )
             direction = -1
@@ -221,7 +221,7 @@ def generate_face_mill_gcode(
         if direction == 1:
             gcode.append(
                 "G01 X{:.2f} Y{:.2f} F{:.1f}".format(
-                    workpiece_short + 5 + (tool_diameter / 2), -workpiece_thick / 2, adjustment_feed_rate
+                    short_stock_thickness + safe_tool_distance + (tool_diameter / 2), -workpiece_thick / 2, adjustment_feed_rate
                 )
             )
             direction = -1
@@ -257,7 +257,7 @@ def generate_face_mill_gcode(
         if direction == 1:
             gcode.append(
                 "G01 X{:.2f} Y{:.2f} F{:.1f}".format(
-                    workpiece_short + 5 + (tool_diameter / 2), -workpiece_thick / 2, adjustment_feed_rate
+                    short_stock_thickness + safe_tool_distance + (tool_diameter / 2), -workpiece_thick / 2, adjustment_feed_rate
                 )
             )
             direction = -1
@@ -420,7 +420,7 @@ class GCodeGeneratorGUI:
         ttk.Label(main_frame, text="Output Filename").grid(row=1, column=0, sticky=tk.W, pady=2)
         self.filename_entry = ttk.Entry(main_frame, width=25)
         self.filename_entry.grid(row=2, column=0, sticky=(tk.W + tk.E), pady=2)
-        self.filename_entry.insert(0, "facemill_zigzag")
+        self.filename_entry.insert(0, "facemill_00")
 
         # Generate button
         self.generate_btn = ttk.Button(main_frame, text="Generate NC Program", command=self.generate_gcode)
