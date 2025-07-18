@@ -6,7 +6,7 @@ from tkinter import messagebox, ttk
 def tool_back(code, z_init_post, safe_tool_distance, tool_diameter, workpiece_thickness):
     code.append(f"G00 Z{(z_init_post):.2f}")  # Move to safe height
     code.append(
-        f"G00 X{-safe_tool_distance - (tool_diameter / 2)} Y{workpiece_thickness / 2:.2f}"
+        f"G00 X{-safe_tool_distance - (tool_diameter / 2)} Y{-workpiece_thickness / 2:.2f}"
     )  # Move to starting position (slightly before material)
 
 
@@ -58,9 +58,9 @@ def generate_face_mill_gcode(
     workpiece_thick=20.0,  # Thick side of material (mm)
     parallel_block_long=0.0,  # Parallel block for long side (mm)
     parallel_block_short=0.0,  # Parallel block for short side (mm)
-    long_stock_thickness=5.0,  # Long material thickness (mm)
-    short_stock_thickness=3.0,  # Short material thickness (mm)
-    tool_diameter=50.0,  # Face mill diameter (mm)
+    long_stock_thickness=155.0,  # Long material thickness (mm)
+    short_stock_thickness=53.0,  # Short material thickness (mm)
+    tool_diameter=63.0,  # Face mill diameter (mm)
     feed_rate=500.0,  # Feed rate (mm/min)
     spindle_speed=2000,  # Spindle speed (RPM)
     depth_of_cut=1.0,  # Depth of cut per pass in adjustment (mm)
@@ -70,15 +70,20 @@ def generate_face_mill_gcode(
     debug=False,  # Debug switch
 ):
     ### JUST CLEAN LONG SIDE ###
+    # Long side Z-position (top of workpiece_short + safe height)
+    z_long_init = workpiece_short + safe_z_distance + parallel_block_long
+
     # Calculate just_clean_depth as a fraction of stock_thickness
-    just_clean_depth = long_stock_thickness * just_clean_fraction
-    just_clean_depth = max(0.1, min(just_clean_depth, 0.5))  # Limit between 0.1mm and 0.5mm
+    just_clean_depth = (short_stock_thickness - workpiece_short) * just_clean_fraction
+    just_clean_depth = max(0.1, min(just_clean_depth, 1.0))  # Limit between 0.1mm and 0.5mm
 
     # Remaining stock after just clean
-    remaining_stock = long_stock_thickness - just_clean_depth
+    remaining_stock = (short_stock_thickness - workpiece_short) - just_clean_depth
 
     # Calculate number of adjustment passes based on remaining stock
     num_passes = int(remaining_stock / depth_of_cut) + (remaining_stock % depth_of_cut > 0)
+
+    spindle_speed = int(spindle_speed)
 
     if debug is True:
         debug_message("Long", just_clean_depth, remaining_stock, num_passes)
@@ -97,21 +102,22 @@ def generate_face_mill_gcode(
     gcode.append("M06 T10")  # Tool change to face mill
     gcode.append(f"M03 S{spindle_speed}")  # Spindle start
 
-    # Long side Z-position (top of workpiece_short + safe height)
-    z_long_init = workpiece_short + safe_z_distance + parallel_block_long
     tool_offset(gcode, z_long_init)
 
     # Current Y position and direction for zigzag
     direction = 1  # 1 for forward, -1 for reverse
 
+    gcode.append("(CEKAM SISI PANJANG)")
     gcode.append("(JUST CLEAN SISI PANJANG)")
     tool_back(gcode, z_long_init, safe_tool_distance, tool_diameter, workpiece_thick)
 
     # Just clean pass
     start_coolant(gcode)
-    gcode.append(f"G01 Z{workpiece_short + parallel_block_long - just_clean_depth:.2f} F{feed_rate / 2:.1f}")  # Plunge
     gcode.append(
-        f"G01 X{workpiece_long + 5 + (tool_diameter / 2):.2f} Y{workpiece_thick / 2:.2f} F{feed_rate / 2:.1f}"
+        f"G01 Z{short_stock_thickness + parallel_block_long - just_clean_depth:.2f} F{feed_rate / 2:.1f}"
+    )  # Plunge
+    gcode.append(
+        f"G01 X{workpiece_long + 5 + (tool_diameter / 2):.2f} Y{-workpiece_thick / 2:.2f} F{feed_rate / 2:.1f}"
     )  # Cut
     tool_back(gcode, z_long_init, safe_tool_distance, tool_diameter, workpiece_thick)
     stop_coolant(gcode)
@@ -121,27 +127,30 @@ def generate_face_mill_gcode(
     tool_offset(gcode, z_height=z_long_init)
 
     ### ADJUSTMENT LONG SIDE ###
+    gcode.append("(PUTAR KE SISI BERLAWANAN)")
     gcode.append("(ADJUSTMENT SISI PANJANG)")
     tool_back(gcode, z_long_init, safe_tool_distance, tool_diameter, workpiece_thick)
     start_coolant(gcode)
     for pass_num in range(num_passes):
         # Calculate current depth (after just clean)
         current_depth = just_clean_depth + ((pass_num + 1) * depth_of_cut)
-        if current_depth > long_stock_thickness:
-            current_depth = long_stock_thickness  # Cap at long stock thickness
+        if current_depth > (short_stock_thickness - workpiece_short):
+            current_depth = short_stock_thickness - workpiece_short  # Cap at long stock thickness
 
         # Generate cutting moves
-        gcode.append(f"G01 Z{workpiece_short + parallel_block_long - current_depth:.2f} F{feed_rate / 2:.1f}")  # Plunge
+        gcode.append(
+            f"G01 Z{short_stock_thickness + parallel_block_long - current_depth:.2f} F{feed_rate / 2:.1f}"
+        )  # Plunge
         if direction == 1:
             adjustment_feed_rate = feed_rate / 2 if num_passes - 1 == pass_num else feed_rate
             gcode.append(
-                f"G01 X{workpiece_long + 5 + (tool_diameter / 2):.2f} Y{workpiece_thick / 2:.2f} F{adjustment_feed_rate:.1f}"
+                f"G01 X{workpiece_long + 5 + (tool_diameter / 2):.2f} Y{-workpiece_thick / 2:.2f} F{adjustment_feed_rate:.1f}"
             )
             direction = -1
         else:
             adjustment_feed_rate = feed_rate / 2 if num_passes - 1 == pass_num else feed_rate
             gcode.append(
-                f"G01 X{-tool_diameter / 2 - safe_tool_distance:.2f} Y{workpiece_thick / 2:.2f} F{adjustment_feed_rate:.1f}"
+                f"G01 X{-tool_diameter / 2 - safe_tool_distance:.2f} Y{-workpiece_thick / 2:.2f} F{adjustment_feed_rate:.1f}"
             )
             direction = 1
     tool_back(gcode, z_long_init, safe_tool_distance, tool_diameter, workpiece_thick)
@@ -149,15 +158,16 @@ def generate_face_mill_gcode(
     tool_zero_return(gcode, y_z_axis=True)
     pause_process(gcode, spindle_speed)
     reset_coordinate(gcode)
-    tool_offset(gcode, z_height=z_long_init)
 
     ### JUST CLEAN SHORT SIDE ###
+    z_short_init = workpiece_long + safe_z_distance + parallel_block_long  # Adjusted for short side
+    tool_offset(gcode, z_height=z_short_init)
     # Calculate just_clean_depth as a fraction of stock_thickness
-    just_clean_depth = short_stock_thickness * just_clean_fraction
-    just_clean_depth = max(0.1, min(just_clean_depth, 0.5))  # Limit between 0.1mm and 0.5mm
+    just_clean_depth = (long_stock_thickness - workpiece_short) * just_clean_fraction
+    just_clean_depth = max(0.1, min(just_clean_depth, 1.0))  # Limit between 0.1mm and 0.5mm
 
     # Remaining stock after just clean
-    remaining_stock = short_stock_thickness - just_clean_depth
+    remaining_stock = (long_stock_thickness - workpiece_long) - just_clean_depth
 
     # Calculate number of adjustment passes based on remaining stock
     num_passes = int(remaining_stock / depth_of_cut) + (remaining_stock % depth_of_cut > 0)
@@ -167,15 +177,17 @@ def generate_face_mill_gcode(
 
     direction = 1  # 1 for forward, -1 for reverse
 
-    z_short_init = workpiece_long + safe_z_distance + parallel_block_long  # Adjusted for short side
+    gcode.append("(CEKAM SISI PENDEK)")
     gcode.append("(JUST CLEAN SISI PENDEK)")
     tool_back(gcode, z_short_init, safe_tool_distance, tool_diameter, workpiece_thick)
 
     # Just clean pass
     start_coolant(gcode)
-    gcode.append(f"G01 Z{workpiece_long + parallel_block_short - just_clean_depth:.2f} F{feed_rate / 2:.1f}")  # Plunge
     gcode.append(
-        f"G01 X{workpiece_short + 5 + (tool_diameter / 2):.2f} Y{workpiece_thick / 2:.2f} F{feed_rate / 2:.1f}"
+        f"G01 Z{long_stock_thickness + parallel_block_short - just_clean_depth:.2f} F{feed_rate / 2:.1f}"
+    )  # Plunge
+    gcode.append(
+        f"G01 X{workpiece_short + 5 + (tool_diameter / 2):.2f} Y{-workpiece_thick / 2:.2f} F{feed_rate / 2:.1f}"
     )  # Cut
     tool_back(gcode, z_short_init, safe_tool_distance, tool_diameter, workpiece_thick)
     stop_coolant(gcode)
@@ -185,27 +197,30 @@ def generate_face_mill_gcode(
     tool_offset(gcode, z_short_init)
 
     ### ADJUSTMENT SHORT SIDE ###
+    gcode.append("(PUTAR KE SISI BERLAWANAN)")
     gcode.append("(ADJUSTMENT SISI PENDEK)")
     tool_back(gcode, z_short_init, safe_tool_distance, tool_diameter, workpiece_thick)
     start_coolant(gcode)
     for pass_num in range(num_passes):
         # Calculate current depth (after just clean)
         current_depth = just_clean_depth + ((pass_num + 1) * depth_of_cut)
-        if current_depth > short_stock_thickness:
-            current_depth = short_stock_thickness  # Cap at short stock thickness
+        if current_depth > (long_stock_thickness - workpiece_long):
+            current_depth = long_stock_thickness - workpiece_long  # Cap at short stock thickness
 
         # Generate cutting moves
-        gcode.append(f"G01 Z{workpiece_long + parallel_block_short - current_depth:.2f} F{feed_rate / 2:.1f}")  # Plunge
+        gcode.append(
+            f"G01 Z{long_stock_thickness + parallel_block_short - current_depth:.2f} F{feed_rate / 2:.1f}"
+        )  # Plunge
         if direction == 1:
             adjustment_feed_rate = feed_rate / 2 if num_passes - 1 == pass_num else feed_rate
             gcode.append(
-                f"G01 X{workpiece_short + 5 + (tool_diameter / 2):.2f} Y{workpiece_thick / 2:.2f} F{adjustment_feed_rate:.1f}"
+                f"G01 X{workpiece_short + 5 + (tool_diameter / 2):.2f} Y{-workpiece_thick / 2:.2f} F{adjustment_feed_rate:.1f}"
             )
             direction = -1
         else:
             adjustment_feed_rate = feed_rate / 2 if num_passes - 1 == pass_num else feed_rate
             gcode.append(
-                f"G01 X{-tool_diameter / 2 - safe_tool_distance:.2f} Y{workpiece_thick / 2:.2f} F{adjustment_feed_rate:.1f}"
+                f"G01 X{-tool_diameter / 2 - safe_tool_distance:.2f} Y{-workpiece_thick / 2:.2f} F{adjustment_feed_rate:.1f}"
             )
             direction = 1
 
@@ -250,20 +265,20 @@ class GCodeGeneratorGUI:
 
         # Parameters and their default values
         self.parameters = {
-            "workpiece_long": 150.0,
-            "workpiece_short": 50.0,
-            "workpiece_thick": 20.0,
-            "parallel_block_long": 0.0,
-            "parallel_block_short": 0.0,
-            "long_stock_thickness": 5.0,
-            "short_stock_thickness": 3.0,
-            "tool_diameter": 50.0,
-            "feed_rate": 500.0,
-            "spindle_speed": 2000.0,
-            "depth_of_cut": 1.0,
-            "safe_z_distance": 20.0,
-            "safe_tool_distance": 5.0,
-            "just_clean_fraction": 0.1,
+            "workpiece_long": [150.0, "Panjang Blank"],
+            "workpiece_short": [50.0, "Lebar Blank"],
+            "workpiece_thick": [20.0, "Tebal Blank"],
+            "parallel_block_long": [0.0, "Parallel Block Panjang"],
+            "parallel_block_short": [0.0, "Parallel Block Pendek"],
+            "long_stock_thickness": [155.0, "Panjang Aktual"],
+            "short_stock_thickness": [53.0, "Lebar Aktual"],
+            "tool_diameter": [60.0, "Diameter Tool"],
+            "feed_rate": [410.0, "Feed Rate"],
+            "spindle_speed": [1500.0, "Kecepatan Spindle"],
+            "depth_of_cut": [1.0, "Depth of Cut"],
+            "safe_z_distance": [50.0, "Safe Z Distance"],
+            "safe_tool_distance": [5.0, "Safe X Distance"],
+            "just_clean_fraction": [0.1, "Just Clean Fraction"],
             "debug": False,
         }
 
@@ -292,40 +307,39 @@ class GCodeGeneratorGUI:
 
         # Workpiece Settings Tab
         row = 0
-        for param in workpiece_params:
-            label_text = param.replace("_", " ").title()
-            ttk.Label(workpiece_frame, text=f"{label_text}", width=20, anchor="e").grid(
-                row=row, column=0, pady=2, padx=2
-            )
-            self.entries[param] = ttk.Entry(workpiece_frame, width=10)
-            self.entries[param].grid(row=row, column=1, sticky=(tk.W, tk.E), pady=2)
-            self.entries[param].insert(0, str(self.parameters[param]))
+        for param in self.parameters:
+            if param in workpiece_params:
+                label_text = self.parameters[param][1]
+                ttk.Label(workpiece_frame, text=f"{label_text}", width=20, anchor="e").grid(
+                    row=row, column=0, pady=2, padx=2
+                )
+                self.entries[param] = ttk.Entry(workpiece_frame, width=10)
+                self.entries[param].grid(row=row, column=1, sticky=(tk.W, tk.E), pady=2)
+                self.entries[param].insert(0, str(self.parameters[param][0]))
 
-            units = "mm" if "fraction" not in param else "%"
-            ttk.Label(workpiece_frame, text=units, width=10).grid(row=row, column=2, sticky=tk.W, pady=2)
-            row += 1
+                units = "mm" if "fraction" not in param else "%"
+                ttk.Label(workpiece_frame, text=units, width=10).grid(row=row, column=2, sticky=tk.W, pady=2)
+                row += 1
 
         # Tool Settings Tab
         row = 0
-        for param in tool_params:
-            label_text = param.replace("_", " ").title()
-            ttk.Label(
-                tool_frame,
-                text=f"{label_text}",
-                width=20,
-                anchor="e",
-            ).grid(row=row, column=0, pady=2, padx=2)
-            self.entries[param] = ttk.Entry(tool_frame, width=10)
-            self.entries[param].grid(row=row, column=1, sticky=(tk.W, tk.E), pady=2)
-            self.entries[param].insert(0, str(self.parameters[param]))
+        for param in self.parameters:
+            if param in tool_params:
+                label_text = self.parameters[param][1]
+                ttk.Label(tool_frame, text=f"{label_text}", width=20, anchor="e").grid(
+                    row=row, column=0, pady=2, padx=2
+                )
+                self.entries[param] = ttk.Entry(tool_frame, width=10)
+                self.entries[param].grid(row=row, column=1, sticky=(tk.W, tk.E), pady=2)
+                self.entries[param].insert(0, str(self.parameters[param][0]))
 
-            units = "mm" if "fraction" not in param else "%"
-            if param == "feed_rate":
-                units = "mm/min"
-            elif param == "spindle_speed":
-                units = "RPM"
-            ttk.Label(tool_frame, text=units, width=10).grid(row=row, column=2, sticky=tk.W, pady=2)
-            row += 1
+                units = "mm" if "fraction" not in param else "%"
+                if param == "feed_rate":
+                    units = "mm/min"
+                elif param == "spindle_speed":
+                    units = "RPM"
+                ttk.Label(tool_frame, text=units, width=10).grid(row=row, column=2, sticky=tk.W, pady=2)
+                row += 1
 
         # Add Debug checkbox
         self.debug_var = tk.BooleanVar(value=self.parameters["debug"])
