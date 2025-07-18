@@ -1,65 +1,64 @@
+import re
 import tkinter as tk
 from datetime import datetime
 from tkinter import messagebox, ttk
 
-# Material database with recommended parameters
+# Updated material database with single-value parameters
 CUTTING_PARAMETER = {
     "SS400": {
-        "feed_rate": [300.0, 500.0, 1000.0],
-        "spindle_speed": [1400, 1500, 1600],
-        "depth_of_cut": [0.3, 0.5, 1.0],
+        "feed_rate": [1200.0],  # mm/min
+        "spindle_speed": [1500],  # RPM
+        "depth_of_cut": [0.75],  # mm
     },
     "S45C": {
-        "feed_rate": [200.0, 400.0, 800.0],
-        "spindle_speed": [1400, 1500, 1600],
-        "depth_of_cut": [0.3, 0.5, 1.0],
+        "feed_rate": [1000.0],
+        "spindle_speed": [1500],
+        "depth_of_cut": [0.5],
     },
     "DC11": {
-        "feed_rate": [300.0, 400.0, 500.0],
-        "spindle_speed": [1400, 1500, 1600],
-        "depth_of_cut": [0.3, 0.5, 1.0],
+        "feed_rate": [800.0],
+        "spindle_speed": [1200],
+        "depth_of_cut": [0.3],
     },
 }
 
 
-def tool_back(
-    code: list, z_init_post: float, safe_tool_distance: float, tool_diameter: float, workpiece_thickness: float
-):
-    code.append(f"G00 Z{(z_init_post):.2f}")  # Move to safe height
+def tool_back(code, z_init_post, safe_tool_distance, tool_diameter, workpiece_thickness):
+    code.append("G00 Z{:.2f}".format(z_init_post))  # Move to safe height
     code.append(
-        f"G00 X{-safe_tool_distance - (tool_diameter / 2)} Y{-workpiece_thickness / 2:.2f}"
+        "G00 X{:.2f} Y{:.2f}".format(-safe_tool_distance - (tool_diameter / 2), -workpiece_thickness / 2)
     )  # Move to starting position (slightly before material)
 
 
-def start_coolant(code: list):
+def start_coolant(code):
     code.append("M08")
 
 
-def stop_coolant(code: list):
+def stop_coolant(code):
     code.append("M09")
 
 
-def tool_offset(code: list, z_height: float):
-    code.append(f"G43 H04 Z{z_height}")
+def tool_offset(code, z_height):
+    code.append("G43 H04 Z{}".format(z_height))
 
 
-def pause_process(code: list, spindle_speed: int):
+def pause_process(code, spindle_speed):
     code.append("M00")  # Program stop
-    code.append(f"M03 S{spindle_speed}")  # Spindle on after resume
+    code.append("M03 S{}".format(spindle_speed))  # Spindle on after resume
 
 
-def debug_message(message: str, just_clean_depth: float, remaining_stock: float, num_passes: int):
+def debug_message(message, just_clean_depth, remaining_stock, num_passes):
     print("{} Cut".format(message))
     print("Just clean depth: {:.2f} mm".format(just_clean_depth))
     print("Remaining stock: {:.2f} mm".format(remaining_stock))
     print("Number of adjustment passes: {}".format(num_passes))
 
 
-def tool_spindle_stop(code: list):
+def tool_spindle_stop(code):
     code.append("M05")  # Spindle stop
 
 
-def tool_zero_return(code: list, all_axis: bool = False, y_z_axis: bool = False):
+def tool_zero_return(code, all_axis=False, y_z_axis=False):
     if all_axis is True:  # zero return on start and end program
         code.append("G91 G30 Z0.0")
         code.append("G91 G28 Y0.0")
@@ -69,26 +68,26 @@ def tool_zero_return(code: list, all_axis: bool = False, y_z_axis: bool = False)
         code.append("G91 G28 Y0.0")
 
 
-def reset_coordinate(code: list):
+def reset_coordinate(code):
     code.append("G90 G00 G54 X0.0 Y0.0")
 
 
 def generate_face_mill_gcode(
-    workpiece_long: float = 100.0,
-    workpiece_short: float = 50.0,
-    workpiece_thick: float = 20.0,
-    parallel_block_long: float = 0.0,
-    parallel_block_short: float = 0.0,
-    long_stock_thickness: float = 155.0,
-    short_stock_thickness: float = 53.0,
-    tool_diameter: float = 63.0,
-    feed_rate: float = 500.0,
-    spindle_speed: int = 2000,
-    depth_of_cut: float = 1.0,
-    safe_z_distance: float = 20.0,
-    safe_tool_distance: float = 5.0,
-    just_clean_fraction: float = 0.1,
-    debug: bool = False,
+    workpiece_long=100.0,
+    workpiece_short=50.0,
+    workpiece_thick=20.0,
+    parallel_block_long=0.0,
+    parallel_block_short=0.0,
+    long_stock_thickness=155.0,
+    short_stock_thickness=53.0,
+    tool_diameter=63.0,
+    feed_rate=500.0,
+    spindle_speed=2000,
+    depth_of_cut=1.0,
+    safe_z_distance=20.0,
+    safe_tool_distance=5.0,
+    just_clean_fraction=0.1,
+    debug=False,
 ):
     z_long_init = workpiece_short + safe_z_distance + parallel_block_long
     total_stock_long = short_stock_thickness - workpiece_short
@@ -279,7 +278,7 @@ def generate_face_mill_gcode(
     return gcode
 
 
-def save_gcode_to_file(gcode_lines: list, filename: str = "face_mill.nc"):
+def save_gcode_to_file(gcode_lines, filename="face_mill.nc"):
     """Save G-code to a file"""
     with open(filename, "w") as f:
         for line in gcode_lines:
@@ -290,7 +289,7 @@ class GCodeGeneratorGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Automatic Blanking")
-        self.root.geometry("300x450")  # Increased height to accommodate material selection
+        self.root.geometry("300x450")  # Restored height for material selection
 
         # Create main frame
         main_frame = ttk.Frame(root, padding="10")
@@ -308,7 +307,7 @@ class GCodeGeneratorGUI:
         tool_frame = ttk.Frame(notebook, padding="5")
         notebook.add(tool_frame, text="Tool Settings")
 
-        # Parameters and their default values
+        # Parameters and their default values (aligned with SS400)
         self.parameters = {
             "workpiece_long": [150.0, "Panjang Blank"],
             "workpiece_short": [50.0, "Lebar Blank"],
@@ -318,9 +317,9 @@ class GCodeGeneratorGUI:
             "long_stock_thickness": [155.0, "Panjang Aktual"],
             "short_stock_thickness": [55.0, "Lebar Aktual"],
             "tool_diameter": [63.0, "Diameter Tool"],
-            "feed_rate": [410.0, "Feed Rate"],
-            "spindle_speed": [1500.0, "Kecepatan Spindle"],
-            "depth_of_cut": [0.5, "Depth of Cut"],
+            "feed_rate": [1200.0, "Feed Rate"],  # SS400 default
+            "spindle_speed": [1500.0, "Kecepatan Spindle"],  # SS400 default
+            "depth_of_cut": [0.75, "Depth of Cut"],  # SS400 default
             "safe_z_distance": [50.0, "Safe Z Distance"],
             "safe_tool_distance": [5.0, "Safe X Distance"],
             "just_clean_fraction": [0.1, "Just Clean Fraction"],
@@ -366,49 +365,45 @@ class GCodeGeneratorGUI:
         material_combo.bind("<<ComboboxSelected>>", self.update_material_params)
         row += 1
 
-        for param in self.parameters:
-            if param in workpiece_params:
-                label_text = self.parameters[param][1]
-                ttk.Label(workpiece_frame, text=f"{label_text}", width=20, anchor="e").grid(
-                    row=row, column=0, pady=2, padx=2
-                )
-                self.entries[param] = ttk.Entry(workpiece_frame, width=10)
-                self.entries[param].grid(row=row, column=1, sticky=(tk.W, tk.E), pady=2)
-                self.entries[param].insert(0, str(self.parameters[param][0]))
+        for param in workpiece_params:
+            label_text = self.parameters[param][1]
+            ttk.Label(workpiece_frame, text="{}".format(label_text), width=20, anchor="e").grid(
+                row=row, column=0, pady=2, padx=2
+            )
+            self.entries[param] = ttk.Entry(workpiece_frame, width=10)
+            self.entries[param].grid(row=row, column=1, sticky=(tk.W, tk.E), pady=2)
+            self.entries[param].insert(0, str(self.parameters[param][0]))
 
-                units = "mm" if "fraction" not in param else "%"
-                ttk.Label(workpiece_frame, text=units, width=10).grid(row=row, column=2, sticky=tk.W, pady=2)
-                row += 1
+            units = "mm" if "fraction" not in param else "%"
+            ttk.Label(workpiece_frame, text=units, width=10).grid(row=row, column=2, sticky=tk.W, pady=2)
+            row += 1
 
         # Tool Settings Tab
         row = 0
+        for param in tool_params:
+            label_text = self.parameters[param][1]
+            ttk.Label(tool_frame, text="{}".format(label_text), width=20, anchor="e").grid(
+                row=row, column=0, pady=2, padx=2
+            )
 
-        # Tool parameters
-        for param in self.parameters:
-            if param in tool_params:
-                label_text = self.parameters[param][1]
-                ttk.Label(tool_frame, text=f"{label_text}", width=20, anchor="e").grid(
-                    row=row, column=0, pady=2, padx=2
-                )
+            if param in ["feed_rate", "spindle_speed", "depth_of_cut"]:
+                # Use Combobox for these parameters
+                self.entries[param] = ttk.Combobox(tool_frame, width=10, state="readonly")
+                self.update_combo_values(param, "SS400")  # Initialize with SS400
+            else:
+                # Use Entry for other parameters
+                self.entries[param] = ttk.Entry(tool_frame, width=10)
+                self.entries[param].insert(0, str(self.parameters[param][0]))
 
-                if param in ["feed_rate", "spindle_speed", "depth_of_cut"]:
-                    # Use Combobox for these parameters
-                    self.entries[param] = ttk.Combobox(tool_frame, width=10, state="readonly")
-                    self.update_combo_values(param, "SS400")  # Default material
-                else:
-                    # Use Entry for other parameters
-                    self.entries[param] = ttk.Entry(tool_frame, width=10)
-                    self.entries[param].insert(0, str(self.parameters[param][0]))
+            self.entries[param].grid(row=row, column=1, sticky=(tk.W + tk.E), pady=2)
 
-                self.entries[param].grid(row=row, column=1, sticky=(tk.W, tk.E), pady=2)
-
-                units = "mm" if "fraction" not in param else "%"
-                if param == "feed_rate":
-                    units = "mm/min"
-                elif param == "spindle_speed":
-                    units = "RPM"
-                ttk.Label(tool_frame, text=units, width=10).grid(row=row, column=2, sticky=tk.W, pady=2)
-                row += 1
+            units = "mm" if "fraction" not in param else "%"
+            if param == "feed_rate":
+                units = "mm/min"
+            elif param == "spindle_speed":
+                units = "RPM"
+            ttk.Label(tool_frame, text=units, width=10).grid(row=row, column=2, sticky=tk.W, pady=2)
+            row += 1
 
         # Add Debug checkbox
         self.debug_var = tk.BooleanVar(value=self.parameters["debug"])
@@ -441,16 +436,24 @@ class GCodeGeneratorGUI:
         tool_frame.columnconfigure(1, weight=1)
 
     def update_combo_values(self, param, material):
-        """Update combobox values based on selected material"""
+        """Update Combobox values based on selected material"""
         values = CUTTING_PARAMETER[material][param]
         self.entries[param]["values"] = values
-        self.entries[param].set(values[1])  # Set to middle value by default
+        self.entries[param].set(str(values[0]))  # Set to the single value
 
     def update_material_params(self, event):
         """Update all material-dependent parameters when material changes"""
         material = self.material_var.get()
         for param in ["feed_rate", "spindle_speed", "depth_of_cut"]:
             self.update_combo_values(param, material)
+
+    def validate_number_input(self, value, param_name):
+        """Validate that the input is a number using '.' for decimal point and no ','"""
+        if "," in value:
+            return False, "{} contains a comma. Please use a decimal point (.).".format(param_name)
+        if not re.match(r"^-?\d*\.?\d*$", value):
+            return False, "{} is not a valid number.".format(param_name)
+        return True, ""
 
     def generate_gcode(self):
         try:
@@ -460,11 +463,18 @@ class GCodeGeneratorGUI:
                 if param == "debug":
                     params[param] = self.debug_var.get()
                 else:
-                    value = float(self.entries[param].get())
+                    value_str = self.entries[param].get().strip()
+                    # Validate input for decimal point and no comma
+                    is_valid, error_msg = self.validate_number_input(value_str, self.parameters[param][1])
+                    if not is_valid:
+                        raise ValueError(error_msg)
+                    # Convert to float
+                    value = float(value_str)
+                    # Existing validation for positive/zero values
                     if value < 0 and param[:8] == "parallel":
-                        raise ValueError(f"{param.replace('_', ' ').title()} must be positive or zero")
+                        raise ValueError("{} must be positive or zero".format(param.replace("_", " ").title()))
                     elif value <= 0 and param[:8] != "parallel":
-                        raise ValueError(f"{param.replace('_', ' ').title()} must be positive and not zero")
+                        raise ValueError("{} must be positive and not zero".format(param.replace("_", " ").title()))
                     params[param] = value
 
             # Generate G-code
@@ -473,18 +483,18 @@ class GCodeGeneratorGUI:
             filename = self.filename_entry.get()
             if not filename.endswith(".nc"):
                 filename += ".nc"
-            filename = f"{current_date}_{filename}"
+            filename = "{}_{}".format(current_date, filename)
             save_gcode_to_file(gcode, filename)
 
             # Show generated G-code in a new window
             self.show_gcode_window(gcode)
 
-            self.status_label.config(text=f"Generated and saved to {filename}")
+            self.status_label.config(text="Generated and saved to {}".format(filename))
 
         except ValueError as e:
             messagebox.showerror("Error", str(e))
         except Exception as e:
-            messagebox.showerror("Error", f"An error occurred: {str(e)}")
+            messagebox.showerror("Error", "An error occurred: {}".format(str(e)))
 
     def show_gcode_window(self, gcode):
         # Create new window for G-code preview
@@ -493,9 +503,9 @@ class GCodeGeneratorGUI:
         current_date = datetime.now().strftime("%Y%m%d")
         if not filename.endswith(".nc"):
             filename += ".nc"
-        filename = f"{current_date}_{filename}"
+        filename = "{}_{}".format(current_date, filename)
         save_gcode_to_file(gcode, filename)
-        preview_window.title(f"Preview {filename}")
+        preview_window.title("Preview {}".format(filename))
         preview_window.geometry("400x600")
 
         # Text widget with both vertical and horizontal scrollbars
