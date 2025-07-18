@@ -39,7 +39,7 @@ def stop_coolant(code):
 
 
 def tool_offset(code, z_height):
-    code.append("G43 H04 Z{}".format(z_height))
+    code.append("G43 H08 Z{}".format(z_height))
 
 
 def pause_process(code, spindle_speed):
@@ -112,7 +112,7 @@ def generate_face_mill_gcode(
     tool_zero_return(gcode, all_axis=True)
     reset_coordinate(gcode)
     gcode.append("(FACEMILL DIA. 63)")
-    gcode.append("M06 T10")
+    gcode.append("M06 T08")
     gcode.append("M03 S{}".format(int(spindle_speed)))
     tool_offset(gcode, z_long_init)
 
@@ -130,7 +130,7 @@ def generate_face_mill_gcode(
         gcode.append(
             "G01 Z{:.2f} F{:.1f}".format(short_stock_thickness + parallel_block_long - current_depth, feed_rate / 2)
         )
-        adjustment_feed_rate = feed_rate / 2 if pass_num == passes_per_side_long - 1 else feed_rate
+        adjustment_feed_rate = feed_rate / 6 if pass_num == passes_per_side_long - 1 else feed_rate
         if direction == 1:
             gcode.append(
                 "G01 X{:.2f} Y{:.2f} F{:.1f}".format(
@@ -166,7 +166,7 @@ def generate_face_mill_gcode(
         gcode.append(
             "G01 Z{:.2f} F{:.1f}".format(short_stock_thickness + parallel_block_long - current_depth, feed_rate / 2)
         )
-        adjustment_feed_rate = feed_rate / 2 if pass_num == num_passes_long - 1 else feed_rate
+        adjustment_feed_rate = feed_rate / 6 if pass_num == num_passes_long - 1 else feed_rate
         if direction == 1:
             gcode.append(
                 "G01 X{:.2f} Y{:.2f} F{:.1f}".format(
@@ -217,7 +217,7 @@ def generate_face_mill_gcode(
         gcode.append(
             "G01 Z{:.2f} F{:.1f}".format(long_stock_thickness + parallel_block_short - current_depth, feed_rate / 2)
         )
-        adjustment_feed_rate = feed_rate / 2 if pass_num == passes_per_side_short - 1 else feed_rate
+        adjustment_feed_rate = feed_rate / 6 if pass_num == passes_per_side_short - 1 else feed_rate
         if direction == 1:
             gcode.append(
                 "G01 X{:.2f} Y{:.2f} F{:.1f}".format(
@@ -253,7 +253,7 @@ def generate_face_mill_gcode(
         gcode.append(
             "G01 Z{:.2f} F{:.1f}".format(long_stock_thickness + parallel_block_short - current_depth, feed_rate / 2)
         )
-        adjustment_feed_rate = feed_rate / 2 if pass_num == num_passes_short - 1 else feed_rate
+        adjustment_feed_rate = feed_rate / 6 if pass_num == num_passes_short - 1 else feed_rate
         if direction == 1:
             gcode.append(
                 "G01 X{:.2f} Y{:.2f} F{:.1f}".format(
@@ -289,7 +289,7 @@ class GCodeGeneratorGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Automatic Blanking")
-        self.root.geometry("300x450")  # Restored height for material selection
+        self.root.geometry("335x450")  # Restored height for material selection
 
         # Create main frame
         main_frame = ttk.Frame(root, padding="10")
@@ -314,8 +314,8 @@ class GCodeGeneratorGUI:
             "workpiece_thick": [20.0, "Tebal Blank"],
             "parallel_block_long": [0.0, "Parallel Block Panjang"],
             "parallel_block_short": [0.0, "Parallel Block Pendek"],
-            "long_stock_thickness": [155.0, "Panjang Aktual"],
-            "short_stock_thickness": [55.0, "Lebar Aktual"],
+            "long_stock_thickness": [155.0, "Panjang Aktual Material"],
+            "short_stock_thickness": [55.0, "Lebar Aktual Material"],
             "tool_diameter": [63.0, "Diameter Tool"],
             "feed_rate": [1200.0, "Feed Rate"],  # SS400 default
             "spindle_speed": [1500.0, "Kecepatan Spindle"],  # SS400 default
@@ -331,10 +331,10 @@ class GCodeGeneratorGUI:
             "workpiece_long",
             "workpiece_short",
             "workpiece_thick",
-            "parallel_block_long",
-            "parallel_block_short",
             "long_stock_thickness",
             "short_stock_thickness",
+            "parallel_block_long",
+            "parallel_block_short",
         ]
         tool_params = [
             "tool_diameter",
@@ -352,7 +352,7 @@ class GCodeGeneratorGUI:
         # Workpiece Settings Tab
         row = 0
         # Material Selection
-        ttk.Label(workpiece_frame, text="Material", width=20, anchor="e").grid(row=row, column=0, pady=2, padx=2)
+        ttk.Label(workpiece_frame, text="Material", width=25, anchor="e").grid(row=row, column=0, pady=2, padx=2)
         self.material_var = tk.StringVar(value="SS400")
         material_combo = ttk.Combobox(
             workpiece_frame,
@@ -367,7 +367,7 @@ class GCodeGeneratorGUI:
 
         for param in workpiece_params:
             label_text = self.parameters[param][1]
-            ttk.Label(workpiece_frame, text="{}".format(label_text), width=20, anchor="e").grid(
+            ttk.Label(workpiece_frame, text="{}".format(label_text), width=25, anchor="e").grid(
                 row=row, column=0, pady=2, padx=2
             )
             self.entries[param] = ttk.Entry(workpiece_frame, width=10)
@@ -382,7 +382,7 @@ class GCodeGeneratorGUI:
         row = 0
         for param in tool_params:
             label_text = self.parameters[param][1]
-            ttk.Label(tool_frame, text="{}".format(label_text), width=20, anchor="e").grid(
+            ttk.Label(tool_frame, text="{}".format(label_text), width=25, anchor="e").grid(
                 row=row, column=0, pady=2, padx=2
             )
 
@@ -450,7 +450,7 @@ class GCodeGeneratorGUI:
     def validate_number_input(self, value, param_name):
         """Validate that the input is a number using '.' for decimal point and no ','"""
         if "," in value:
-            return False, "{} contains a comma. Please use a decimal point (.).".format(param_name)
+            return False, "{} jangan memakai koma. gunakan titik (.).".format(param_name)
         if not re.match(r"^-?\d*\.?\d*$", value):
             return False, "{} is not a valid number.".format(param_name)
         return True, ""
