@@ -12,7 +12,7 @@ CNC Blanking is a project designed to facilitate CNC (Computer Numerical Control
 
 # Instructions for Running `blanking.py`
 
-## Option 1: Running blanking.py Using `uv`
+## Option 1: Using `uv`
 `uv` is a Python package and project manager that simplifies running Python scripts and managing dependencies.
 
 ### Prerequisites
@@ -35,7 +35,7 @@ CNC Blanking is a project designed to facilitate CNC (Computer Numerical Control
    ```
 3. Check the script's output in the terminal for any errors or logs.
 
-## Option 2: Running blanking.py by Double-Clicking (as .pyw)
+## Option 2: Double-Clicking (as .pyw)
 This method involves installing Python and converting the script to a `.pyw` file to run it without a console window by double-clicking.
 
 ### Prerequisites
